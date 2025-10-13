@@ -1,0 +1,87 @@
+import random
+import numpy as np
+
+# Define the grid size (search area)
+GRID_SIZE = 5  # 5x5 grid
+NUM_DRONES = 10  # Number of drones
+
+# Define the drone class to represent each drone
+class Drone:
+    def __init__(self, x, y):
+        self.x = x  # x-coordinate of the drone
+        self.y = y  # y-coordinate of the drone
+        self.fitness = 0  # Fitness: how much area it has searched successfully
+
+    def search_area(self):
+        # Simulate the drone searching its area (random chance of finding something)
+        if random.random() < 0.2:  # 20% chance the drone finds something
+            self.fitness += 1
+        return self.fitness
+
+    def update_position(self, new_x, new_y):
+        # Update drone position
+        self.x = new_x
+        self.y = new_y
+
+# Function to initialize drones in random positions within the grid
+def initialize_drones():
+    drones = []
+    for _ in range(NUM_DRONES):
+        x = random.randint(0, GRID_SIZE - 1)
+        y = random.randint(0, GRID_SIZE - 1)
+        drones.append(Drone(x, y))
+    return drones
+
+# Function to evaluate the fitness of all drones (i.e., how much area they've searched)
+def evaluate_drones(drones):
+    total_fitness = 0
+    for drone in drones:
+        total_fitness += drone.search_area()
+    return total_fitness
+
+# Function to get the neighboring drones of a given drone
+def get_neighbors(drone, drones):
+    neighbors = []
+    for other_drone in drones:
+        if other_drone != drone:
+            # Check if within 1 distance in either x or y direction
+            if abs(drone.x - other_drone.x) <= 1 and abs(drone.y - other_drone.y) <= 1:
+                neighbors.append(other_drone)
+    return neighbors
+
+# Function to update drone's position based on neighbors' positions
+def update_drone_position(drone, neighbors):
+    # Simple strategy: move to a nearby unexplored area if possible
+    if neighbors:
+        # Get the best neighbor (one with the highest fitness)
+        best_neighbor = max(neighbors, key=lambda n: n.fitness)
+        # Move towards the best neighbor's position (if it's not already there)
+        if best_neighbor.x != drone.x or best_neighbor.y != drone.y:
+            drone.update_position(best_neighbor.x, best_neighbor.y)
+
+# Main function to simulate the drone search and rescue operation
+def search_and_rescue():
+    drones = initialize_drones()
+    best_fitness = 0
+
+    # Run for a set number of iterations (time cycles)
+    num_iterations = 20
+    for iteration in range(num_iterations):
+        # Evaluate and update the drones' fitness
+        total_fitness = evaluate_drones(drones)
+        
+        # Track the best fitness (maximize search efficiency)
+        if total_fitness > best_fitness:
+            best_fitness = total_fitness
+            print(f"Iteration {iteration + 1}: Best Fitness = {best_fitness}")
+        
+        # Update the drones' positions based on neighbors
+        for drone in drones:
+            neighbors = get_neighbors(drone, drones)
+            update_drone_position(drone, neighbors)
+
+    return best_fitness
+
+# Run the simulation
+best_fitness = search_and_rescue()
+print(f"Best Fitness Achieved: {best_fitness}")
