@@ -1,0 +1,126 @@
+import random
+
+# =========================================================
+# NETWORK DATA
+# =========================================================
+PIPE_LENGTHS = [500, 700, 400, 600, 300]   # meters
+AVAILABLE_DIAMETERS = [100, 150, 200, 250]  # mm
+
+DIAMETER_COST = {
+    100: 45,
+    150: 65,
+    200: 95,
+    250: 140
+}
+
+MIN_PRESSURE = 30
+SOURCE_PRESSURE = 60
+DEMAND_FLOW = 0.045   # higher demand to activate constraint
+
+# =========================================================
+# GA PARAMETERS
+# =========================================================
+POP_SIZE = 40
+GENERATIONS = 80
+PC = 0.8  # Crossover rate
+PM = 0.12  # Mutation rate
+PRINT_EVERY = 10
+
+# =========================================================
+# PRESSURE LOSS MODEL
+# =========================================================
+def pressure_loss(flow, length, diameter):
+    d = diameter / 1000
+    return 0.015 * length * (flow / d) ** 2
+
+# =========================================================
+# FITNESS FUNCTION
+# =========================================================
+def fitness(chromosome):
+    total_cost = 0
+    total_loss = 0
+
+    for i, d in enumerate(chromosome):
+        L = PIPE_LENGTHS[i]
+        total_cost += DIAMETER_COST[d] * L
+        total_loss += pressure_loss(DEMAND_FLOW, L, d)
+
+    pressure = SOURCE_PRESSURE - total_loss
+
+    penalty = 0
+    if pressure < MIN_PRESSURE:
+        penalty = 20000 * (MIN_PRESSURE - pressure) ** 2
+
+    return total_cost + penalty
+
+# =========================================================
+# GA OPERATORS
+# =========================================================
+def init_population():
+    return [
+        [random.choice(AVAILABLE_DIAMETERS) for _ in PIPE_LENGTHS]
+        for _ in range(POP_SIZE)
+    ]
+
+def selection(population):
+    fit = [1 / (1 + fitness(ind)) for ind in population]
+    total = sum(fit)
+    probs = [f / total for f in fit]
+    return random.choices(population, probs)[0]
+
+def crossover(p1, p2):
+    if random.random() < PC:
+        point = random.randint(1, len(p1) - 1)
+        return (
+            p1[:point] + p2[point:],
+            p2[:point] + p1[point:]
+        )
+    return p1[:], p2[:]
+
+def mutation(chrom):
+    for i in range(len(chrom)):
+        if random.random() < PM:
+            chrom[i] = random.choice(AVAILABLE_DIAMETERS)
+    return chrom
+
+# =========================================================
+# MAIN LOOP
+# =========================================================
+population = init_population()
+best_global = None
+best_global_cost = float("inf")
+
+print("=== GA PIPELINE OPTIMIZATION ===\n")
+
+for gen in range(GENERATIONS):
+    new_population = []
+
+    while len(new_population) < POP_SIZE:
+        p1 = selection(population)
+        p2 = selection(population)
+        c1, c2 = crossover(p1, p2)
+        new_population.append(mutation(c1))
+        new_population.append(mutation(c2))
+
+    population = new_population[:POP_SIZE]
+
+    best_gen = min(population, key=fitness)
+    cost = fitness(best_gen)
+
+    if cost < best_global_cost:
+        best_global = best_gen[:]
+        best_global_cost = cost
+
+    # Print output every few generations to track evolution
+    if (gen + 1) % PRINT_EVERY == 0 or gen == 0:
+        print(
+            f"Gen {gen+1:03d} | Cost: {best_global_cost:.2f} | Diameters: {best_global}"
+        )
+
+# =========================================================
+# FINAL SOLUTION
+# =========================================================
+print("\n=== FINAL DESIGN ===")
+for i, d in enumerate(best_global):
+    print(f"Pipe {i+1}: {d} mm")
+print(f"Total Cost: {best_global_cost:.2f}")
